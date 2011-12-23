@@ -41,7 +41,7 @@ class JContentHelper extends JCacheObject
 	 *                                     factory.
 	 *
 	 * @param   mixed            $db       An optional argument to provide dependency injection for the database
-	 *                                     adapter.  If the argument is a JDatbase adapter that object will become
+	 *                                     adapter.  If the argument is a JDatabase adapter that object will become
 	 *                                     the database adapter, otherwise the factory's default adapter will be used.
 	 *
 	 * @since   12.1

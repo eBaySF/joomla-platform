@@ -132,7 +132,7 @@ class JContent extends JDatabaseObject implements JAuthorisationAuthorisable
 	 * @since   12.1
 	 * @throws  RuntimeException
 	 */
-	public function __construct($prefix, $type, JContentFactory $factory = null, JDatabase $db = null, JWeb $app = null, JUser $user = null)
+	public function __construct($prefix, $type, JContentFactory $factory = null, JDatabase $db = null, JApplicationWeb $app = null, JUser $user = null)
 	{
 		// Check if the type table is defined.
 		if (!empty($type->table))
