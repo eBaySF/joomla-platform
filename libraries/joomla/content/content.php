@@ -279,7 +279,14 @@ class JContent extends JDatabaseObject implements JAuthorisationAuthorisable
 
 		// Get the user id (or null) and session id.
 		$userId = !$this->user->get('guest') ? $this->user->get('id') : null;
-		$sessionId = $this->app->getSession()->getId();
+		if ($this->app instanceof JWeb)
+		{
+			$sessionId = $this->app->getSession()->getId();
+		}
+		else
+		{
+			$sessionId = JFactory::getSession()->getId();
+		}
 
 		// Check if the item is checked out by this session.
 		if ($this->checked_out_session == $sessionId)
