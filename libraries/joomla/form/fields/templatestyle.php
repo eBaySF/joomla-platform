@@ -3,7 +3,7 @@
  * @package     Joomla.Platform
  * @subpackage  Form
  *
- * @copyright   Copyright (C) 2005 - 2011 Open Source Matters, Inc. All rights reserved.
+ * @copyright   Copyright (C) 2005 - 2012 Open Source Matters, Inc. All rights reserved.
  * @license     GNU General Public License version 2 or later; see LICENSE
  */
 
@@ -85,6 +85,7 @@ class JFormFieldTemplateStyle extends JFormFieldGroupedList
 					|| $lang->load('tpl_' . $template . '.sys', $client->path, $lang->getDefault(), false, false)
 					|| $lang->load('tpl_' . $template . '.sys', $client->path . '/templates/' . $template, $lang->getDefault(), false, false);
 				$name = JText::_($style->name);
+
 				// Initialize the group if necessary.
 				if (!isset($groups[$name]))
 				{

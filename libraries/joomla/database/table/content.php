@@ -3,7 +3,7 @@
  * @package     Joomla.Platform
  * @subpackage  Database
  *
- * @copyright   Copyright (C) 2005 - 2011 Open Source Matters, Inc. All rights reserved.
+ * @copyright   Copyright (C) 2005 - 2012 Open Source Matters, Inc. All rights reserved.
  * @license     GNU General Public License version 2 or later; see LICENSE
  */
 
@@ -211,9 +211,16 @@ class JTableContent extends JTable
 		if (!empty($this->metakey))
 		{
 			// Only process if not empty
-			$bad_characters = array("\n", "\r", "\"", "<", ">"); // array of characters to remove
-			$after_clean = JString::str_ireplace($bad_characters, "", $this->metakey); // remove bad characters
-			$keys = explode(',', $after_clean); // create array using commas as delimiter
+
+			// Array of characters to remove
+			$bad_characters = array("\n", "\r", "\"", "<", ">");
+
+			// Remove bad characters
+			$after_clean = JString::str_ireplace($bad_characters, "", $this->metakey);
+
+			// Create array using commas as delimiter
+			$keys = explode(',', $after_clean);
+
 			$clean_keys = array();
 
 			foreach ($keys as $key)
@@ -224,7 +231,8 @@ class JTableContent extends JTable
 					$clean_keys[] = trim($key);
 				}
 			}
-			$this->metakey = implode(", ", $clean_keys); // put array back together delimited by ", "
+			// Put array back together delimited by ", "
+			$this->metakey = implode(", ", $clean_keys);
 		}
 
 		return true;
@@ -361,43 +369,5 @@ class JTableContent extends JTable
 		$this->setError('');
 
 		return true;
-	}
-
-	/**
-	 * Converts record to XML
-	 *
-	 * @param   boolean  $mapKeysToText  Map foreign keys to text values
-	 *
-	 * @return  string  Record in XML format
-	 *
-	 * @since   11.1
-	 * @deprecated  12.1
-	 * @codeCoverageIgnore
-	 */
-	public function toXML($mapKeysToText = false)
-	{
-		// Deprecation warning.
-		JLog::add('JTableContent::toXML() is deprecated.', JLog::WARNING, 'deprecated');
-
-		if ($mapKeysToText)
-		{
-			// Get the JDatabaseQuery object
-			$query = $this->_db->getQuery(true);
-
-			$query->select($this->_db->quoteName('name'));
-			$query->from($this->_db->quoteName('#__categories'));
-			$query->where($this->_db->quoteName('id') . ' = ' . (int) $this->catid);
-			$this->_db->setQuery($query);
-			$this->catid = $this->_db->loadResult();
-
-			$query->clear();
-			$query->select($this->_db->quoteName('name'));
-			$query->from($this->_db->quoteName('#__users'));
-			$query->where($this->_db->quoteName('id') . ' = ' . (int) $this->created_by);
-			$this->_db->setQuery($query);
-			$this->created_by = $this->_db->loadResult();
-		}
-
-		return parent::toXML($mapKeysToText);
 	}
 }

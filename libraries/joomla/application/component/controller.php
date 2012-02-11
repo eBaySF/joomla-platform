@@ -3,7 +3,7 @@
  * @package     Joomla.Platform
  * @subpackage  Application
  *
- * @copyright   Copyright (C) 2005 - 2011 Open Source Matters, Inc. All rights reserved.
+ * @copyright   Copyright (C) 2005 - 2012 Open Source Matters, Inc. All rights reserved.
  * @license     GNU General Public License version 2 or later; see LICENSE
  */
 
@@ -21,24 +21,6 @@ defined('JPATH_PLATFORM') or die;
  */
 class JController extends JObject
 {
-	/**
-	 * ACO Section for the controller.
-	 *
-	 * @var    string
-	 * @since  11.1
-	 * @deprecated    12.1
-	 */
-	protected $_acoSection;
-
-	/**
-	 * Default ACO Section value for the controller.
-	 *
-	 * @var    string
-	 * @since  11.1
-	 * @deprecated    12.1
-	 */
-	protected $_acoSectionValue;
-
 	/**
 	 * The base path of the controller
 	 *
@@ -344,12 +326,13 @@ class JController extends JObject
 			if (!in_array($mName, $xMethods) || $mName == 'display')
 			{
 				$this->methods[] = strtolower($mName);
+
 				// Auto register the methods as tasks.
 				$this->taskMap[strtolower($mName)] = $mName;
 			}
 		}
 
-		//set the view name
+		// Set the view name
 		if (empty($this->name))
 		{
 			if (array_key_exists('name', $config))
@@ -399,7 +382,7 @@ class JController extends JObject
 		// Set the default model search path
 		if (array_key_exists('model_path', $config))
 		{
-			// user-defined dirs
+			// User-defined dirs
 			$this->addModelPath($config['model_path'], $this->model_prefix);
 		}
 		else
@@ -476,25 +459,6 @@ class JController extends JObject
 		$this->addPath('view', $path);
 
 		return $this;
-	}
-
-	/**
-	 * Authorisation check
-	 *
-	 * @param   string  $task  The ACO Section Value to check access on
-	 *
-	 * @return  boolean  True if authorised
-	 *
-	 * @since   11.1
-	 *
-	 * @deprecated  12.1   Use JAuthorise
-	 */
-	public function authorize($task)
-	{
-		// Deprecation warning.
-		JLog::add('JController::authorize() is deprecated.', JLog::WARNING, 'deprecated');
-
-		$this->authorise($task);
 	}
 
 	/**
@@ -797,6 +761,7 @@ class JController extends JObject
 				if ($item = $menu->getActive())
 				{
 					$params = $menu->getParams($item->id);
+
 					// Set default state data
 					$model->setState('parameters.menu', $params);
 				}
@@ -1041,26 +1006,6 @@ class JController extends JObject
 	}
 
 	/**
-	 * Sets the access control levels.
-	 *
-	 * @param   string  $section  The ACO section (eg, the component).
-	 * @param   string  $value    The ACO section value (if using a constant value).
-	 *
-	 * @return  void
-	 *
-	 * @deprecated  12.1  Use JAccess
-	 * @see     Jaccess
-	 * @since   11.1
-	 */
-	public function setAccessControl($section, $value = null)
-	{
-		// Deprecation warning.
-		JLog::add('JController::setAccessControl() is deprecated.', JLog::WARNING, 'deprecated');
-		$this->_acoSection = $section;
-		$this->_acoSectionValue = $value;
-	}
-
-	/**
 	 * Sets the internal message that is passed with a redirect
 	 *
 	 * @param   string  $text  Message to display on redirect.
@@ -1092,10 +1037,10 @@ class JController extends JObject
 	 */
 	protected function setPath($type, $path)
 	{
-		// clear out the prior search dirs
+		// Clear out the prior search dirs
 		$this->paths[$type] = array();
 
-		// actually add the user-specified directories
+		// Actually add the user-specified directories
 		$this->addPath($type, $path);
 	}
 

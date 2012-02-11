@@ -3,7 +3,7 @@
  * @package     Joomla.Platform
  * @subpackage  Database
  *
- * @copyright   Copyright (C) 2005 - 2011 Open Source Matters, Inc. All rights reserved.
+ * @copyright   Copyright (C) 2005 - 2012 Open Source Matters, Inc. All rights reserved.
  * @license     GNU General Public License version 2 or later; see LICENSE
  */
 
@@ -80,39 +80,40 @@ class JTableUsergroup extends JTable
 	 */
 	public function rebuild($parent_id = 0, $left = 0)
 	{
-		// get the database object
+		// Get the database object
 		$db = &$this->_db;
 
-		// get all children of this node
+		// Get all children of this node
 		$db->setQuery('SELECT id FROM ' . $this->_tbl . ' WHERE parent_id=' . (int) $parent_id . ' ORDER BY parent_id, title');
 		$children = $db->loadColumn();
 
-		// the right value of this node is the left value + 1
+		// The right value of this node is the left value + 1
 		$right = $left + 1;
 
-		// execute this function recursively over all children
+		// Execute this function recursively over all children
 		for ($i = 0, $n = count($children); $i < $n; $i++)
 		{
 			// $right is the current right value, which is incremented on recursion return
 			$right = $this->rebuild($children[$i], $right);
 
-			// if there is an update failure, return false to break out of the recursion
+			// If there is an update failure, return false to break out of the recursion
 			if ($right === false)
 			{
 				return false;
 			}
 		}
 
-		// we've got the left value, and now that we've processed
+		// We've got the left value, and now that we've processed
 		// the children of this node we also know the right value
 		$db->setQuery('UPDATE ' . $this->_tbl . ' SET lft=' . (int) $left . ', rgt=' . (int) $right . ' WHERE id=' . (int) $parent_id);
-		// if there is an update failure, return false to break out of the recursion
+
+		// If there is an update failure, return false to break out of the recursion
 		if (!$db->query())
 		{
 			return false;
 		}
 
-		// return the right value of this node + 1
+		// Return the right value of this node + 1
 		return $right + 1;
 	}
 
@@ -205,14 +206,37 @@ class JTableUsergroup extends JTable
 		}
 
 		$query->clear();
-		$query->set('rules=' . str_repeat('replace(', 4 * count($ids)) . 'rules' . implode('', $replace));
-		$query->update('#__viewlevels');
-		$query->where('rules REGEXP "(,|\\\\[)(' . implode('|', $ids) . ')(,|\\\\])"');
+
+		// SQLSsrv change. Alternative for regexp
+		$query->select('id, rules');
+		$query->from('#__viewlevels');
 		$db->setQuery($query);
-		if (!$db->query())
+		$rules = $db->loadObjectList();
+
+		$match_ids = array();
+		foreach ($rules as $rule)
 		{
-			$this->setError($db->getErrorMsg());
-			return false;
+			foreach ($ids as $id)
+			{
+				if (strstr($rule->rules, '[' . $id) || strstr($rule->rules, ',' . $id) || strstr($rule->rules, $id . ']'))
+				{
+					$match_ids[] = $rule->id;
+				}
+			}
+		}
+
+		if (!empty($match_ids))
+		{
+			$query = $db->getQuery(true);
+			$query->set('rules=' . str_repeat('replace(', 4 * count($ids)) . 'rules' . implode('', $replace));
+			$query->update('#__viewlevels');
+			$query->where('id IN (' . implode(',', $match_ids) . ')');
+			$db->setQuery($query);
+			if (!$db->query())
+			{
+				$this->setError($db->getErrorMsg());
+				return false;
+			}
 		}
 
 		// Delete the user to usergroup mappings for the group(s) from the database.

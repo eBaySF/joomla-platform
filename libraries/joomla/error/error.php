@@ -3,7 +3,7 @@
  * @package     Joomla.Platform
  * @subpackage  Error
  *
- * @copyright   Copyright (C) 2005 - 2011 Open Source Matters, Inc. All rights reserved.
+ * @copyright   Copyright (C) 2005 - 2012 Open Source Matters, Inc. All rights reserved.
  * @license     GNU General Public License version 2 or later; see LICENSE
  */
 
@@ -11,8 +11,10 @@ defined('JPATH_PLATFORM') or die;
 
 // Error Definition: Illegal Options
 define('JERROR_ILLEGAL_OPTIONS', 1);
+
 // Error Definition: Callback does not exist
 define('JERROR_CALLBACK_NOT_CALLABLE', 2);
+
 // Error Definition: Illegal Handler
 define('JERROR_ILLEGAL_MODE', 3);
 
@@ -198,6 +200,7 @@ abstract class JError
 		if ($thrown)
 		{
 			self::handleEcho($exception, array());
+
 			// Inifite loop.
 			jexit();
 		}
@@ -566,7 +569,7 @@ abstract class JError
 
 		if (isset($_SERVER['HTTP_HOST']))
 		{
-			// output as html
+			// Output as html
 			echo "<br /><b>jos-$level_human</b>: "
 				. $error->get('message') . "<br />\n"
 				. (defined('JDEBUG') ? nl2br($trace) : '');

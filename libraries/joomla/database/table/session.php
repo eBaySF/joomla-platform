@@ -3,7 +3,7 @@
  * @package     Joomla.Platform
  * @subpackage  Database
  *
- * @copyright   Copyright (C) 2005 - 2011 Open Source Matters, Inc. All rights reserved.
+ * @copyright   Copyright (C) 2005 - 2012 Open Source Matters, Inc. All rights reserved.
  * @license     GNU General Public License version 2 or later; see LICENSE
  */
 
@@ -179,11 +179,6 @@ class JTableSession extends JTable
 	 */
 	public function delete($oid = null)
 	{
-		//if (!$this->canDelete($msg))
-		//{
-		//	return $msg;
-		//}
-
 		$k = $this->_tbl_key;
 		if ($oid)
 		{

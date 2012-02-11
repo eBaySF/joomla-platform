@@ -3,7 +3,7 @@
  * @package     Joomla.Platform
  * @subpackage  Application
  *
- * @copyright   Copyright (C) 2005 - 2011 Open Source Matters, Inc. All rights reserved.
+ * @copyright   Copyright (C) 2005 - 2012 Open Source Matters, Inc. All rights reserved.
  * @license     GNU General Public License version 2 or later; see LICENSE
  */
 
@@ -282,6 +282,7 @@ class JCategories
 		$app = JFactory::getApplication();
 		$user = JFactory::getUser();
 		$extension = $this->_extension;
+
 		// Record that has this $id has been checked
 		$this->_checkedCategories[$id] = true;
 
@@ -289,7 +290,15 @@ class JCategories
 
 		// Right join with c for category
 		$query->select('c.*');
-		$query->select('CASE WHEN CHAR_LENGTH(c.alias) THEN CONCAT_WS(":", c.id, c.alias) ELSE c.id END as slug');
+		$case_when = ' CASE WHEN ';
+		$case_when .= $query->charLength('c.alias') . '!=0';
+		$case_when .= ' THEN ';
+		$c_id = $query->castAsChar('c.id');
+		$case_when .= $query->concatenate(array($c_id, 'c.alias'), ':');
+		$case_when .= ' ELSE ';
+		$case_when .= $c_id . ' END as slug';
+		$query->select($case_when);
+
 		$query->from('#__categories as c');
 		$query->where('(c.extension=' . $db->Quote($extension) . ' OR c.extension=' . $db->Quote('system') . ')');
 
@@ -305,7 +314,7 @@ class JCategories
 
 		$query->order('c.lft');
 
-		// s for selected id
+		// Note: s for selected id
 		if ($id != 'root')
 		{
 			// Get the selected category
@@ -319,7 +328,7 @@ class JCategories
 		$query->leftJoin($subQuery . 'AS badcats ON badcats.id = c.id');
 		$query->where('badcats.id is null');
 
-		// i for item
+		// Note: i for item
 		if (isset($this->_options['countItems']) && $this->_options['countItems'] == 1)
 		{
 			if ($this->_options['published'] == 1)
@@ -337,7 +346,10 @@ class JCategories
 		}
 
 		// Group by
-		$query->group('c.id');
+		$query->group('c.id, c.asset_id, c.access, c.alias, c.checked_out, c.checked_out_time,
+ 			c.created_time, c.created_user_id, c.description, c.extension, c.hits, c.language, c.level,
+		 	c.lft, c.metadata, c.metadesc, c.metakey, c.modified_time, c.note, c.params, c.parent_id,
+ 			c.path, c.published, c.rgt, c.title, c.modified_user_id');
 
 		// Filter by language
 		if ($app->isSite() && $app->getLanguageFilter())

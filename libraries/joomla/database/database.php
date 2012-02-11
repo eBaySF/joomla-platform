@@ -3,7 +3,7 @@
  * @package     Joomla.Platform
  * @subpackage  Database
  *
- * @copyright   Copyright (C) 2005 - 2011 Open Source Matters, Inc. All rights reserved.
+ * @copyright   Copyright (C) 2005 - 2012 Open Source Matters, Inc. All rights reserved.
  * @license     GNU General Public License version 2 or later; see LICENSE
  */
 
@@ -40,6 +40,14 @@ interface JDatabaseInterface
  */
 abstract class JDatabase implements JDatabaseInterface
 {
+	/**
+	 * The name of the database.
+	 *
+	 * @var    string
+	 * @since  11.4
+	 */
+	private $_database;
+
 	/**
 	 * The name of the database driver.
 	 *
@@ -139,20 +147,6 @@ abstract class JDatabase implements JDatabaseInterface
 	protected $errorMsg;
 
 	/**
-	 * @var         boolean  If true then there are fields to be quoted for the query.
-	 * @since       11.1
-	 * @deprecated  12.1
-	 */
-	protected $hasQuoted = false;
-
-	/**
-	 * @var         array  The fields that are to be quoted.
-	 * @since       11.1
-	 * @deprecated  12.1
-	 */
-	protected $quoted = array();
-
-	/**
 	 * @var    array  JDatabase instances container.
 	 * @since  11.1
 	 */
@@ -173,7 +167,7 @@ abstract class JDatabase implements JDatabaseInterface
 		$connectors = array();
 
 		// Get a list of types.
-		$types = JFolder::files(dirname(__FILE__) . '/database');
+		$types = JFolder::files(__DIR__ . '/database');
 
 		// Loop through the types and find the ones that are available.
 		foreach ($types as $type)
@@ -191,7 +185,7 @@ abstract class JDatabase implements JDatabaseInterface
 			if (!class_exists($class))
 			{
 				// Derive the file path for the driver class.
-				$path = dirname(__FILE__) . '/database/' . $type;
+				$path = __DIR__ . '/database/' . $type;
 
 				// If the file exists register the class with our class loader.
 				if (file_exists($path))
@@ -260,7 +254,7 @@ abstract class JDatabase implements JDatabaseInterface
 			{
 
 				// Derive the file path for the driver class.
-				$path = dirname(__FILE__) . '/database/' . $options['driver'] . '.php';
+				$path = __DIR__ . '/database/' . $options['driver'] . '.php';
 
 				// If the file exists register the class with our class loader.
 				if (file_exists($path))
@@ -420,7 +414,6 @@ abstract class JDatabase implements JDatabaseInterface
 			case 'q':
 				return $this->quote($args[0], isset($args[1]) ? $args[1] : true);
 				break;
-			case 'nq':
 			case 'qn':
 				return $this->quoteName($args[0]);
 				break;
@@ -437,42 +430,15 @@ abstract class JDatabase implements JDatabaseInterface
 	protected function __construct($options)
 	{
 		// Initialise object variables.
+		$this->_database = (isset($options['database'])) ? $options['database'] : '';
+
 		$this->tablePrefix = (isset($options['prefix'])) ? $options['prefix'] : 'jos_';
 		$this->count = 0;
 		$this->errorNum = 0;
 		$this->log = array();
-		$this->quoted = array();
-		$this->hasQuoted = false;
 
 		// Set charactersets (needed for MySQL 4.1.2+).
 		$this->setUTF();
-	}
-
-	/**
-	 * Adds a field or array of field names to the list that are to be quoted.
-	 *
-	 * @param   mixed  $quoted  Field name or array of names.
-	 *
-	 * @return  void
-	 *
-	 * @deprecated  12.1
-	 * @since   11.1
-	 */
-	public function addQuoted($quoted)
-	{
-		// Deprecation warning.
-		JLog::add('JDatabase::addQuoted() is deprecated.', JLog::WARNING, 'deprecated');
-
-		if (is_string($quoted))
-		{
-			$this->quoted[] = $quoted;
-		}
-		else
-		{
-			$this->quoted = array_merge($this->quoted, (array) $quoted);
-		}
-
-		$this->hasQuoted = true;
 	}
 
 	/**
@@ -483,6 +449,19 @@ abstract class JDatabase implements JDatabaseInterface
 	 * @since   11.1
 	 */
 	abstract public function connected();
+
+	/**
+	 * Drops a table from the database.
+	 *
+	 * @param   string   $table     The name of the database table to drop.
+	 * @param   boolean  $ifExists  Optionally specify that the table must exist before it is dropped.
+	 *
+	 * @return  JDatabase  Returns this object to support chaining.
+	 *
+	 * @since   11.4
+	 * @throws  JDatabaseException
+	 */
+	public abstract function dropTable($table, $ifExists = true);
 
 	/**
 	 * Method to escape a string for usage in an SQL statement.
@@ -582,6 +561,18 @@ abstract class JDatabase implements JDatabaseInterface
 	public function getCount()
 	{
 		return $this->count;
+	}
+
+	/**
+	 * Gets the name of the database used by this conneciton.
+	 *
+	 * @return  string
+	 *
+	 * @since   11.4
+	 */
+	protected function getDatabase()
+	{
+		return $this->_database;
 	}
 
 	/**
@@ -724,17 +715,6 @@ abstract class JDatabase implements JDatabaseInterface
 	abstract public function getVersion();
 
 	/**
-	 * Determines if the database engine supports UTF-8 character encoding.
-	 *
-	 * @return  boolean  True if supported.
-	 *
-	 * @since   11.1
-	 *
-	 * @deprecated  12.1
-	 */
-	abstract public function hasUTF();
-
-	/**
 	 * Method to get the auto-incremented value from the last INSERT statement.
 	 *
 	 * @return  integer  The value of the auto-increment field from the last inserted row.
@@ -781,7 +761,7 @@ abstract class JDatabase implements JDatabaseInterface
 
 			// Prepare and sanitize the fields and values for the database query.
 			$fields[] = $this->quoteName($k);
-			$values[] = $this->isQuoted($k) ? $this->quote($v) : (int) $v;
+			$values[] = $this->quote($v);
 		}
 
 		// Set the query and execute the insert.
@@ -1165,6 +1145,18 @@ abstract class JDatabase implements JDatabaseInterface
 	}
 
 	/**
+	 * Locks a table in the database.
+	 *
+	 * @param   string  $tableName  The name of the table to unlock.
+	 *
+	 * @return  JDatabase  Returns this object to support chaining.
+	 *
+	 * @since   11.4
+	 * @throws  JDatabaseException
+	 */
+	public abstract function lockTable($tableName);
+
+	/**
 	 * Execute the SQL statement.
 	 *
 	 * @return  mixed  A database cursor resource on success, boolean false on failure.
@@ -1178,7 +1170,7 @@ abstract class JDatabase implements JDatabaseInterface
 	 * Method to quote and optionally escape a string to database requirements for insertion into the database.
 	 *
 	 * @param   string   $text    The string to quote.
-	 * @param   boolean  $escape  True to escape the string, false to leave it unchanged.
+	 * @param   boolean  $escape  True (default) to escape the string, false to leave it unchanged.
 	 *
 	 * @return  string  The quoted input string.
 	 *
@@ -1193,32 +1185,85 @@ abstract class JDatabase implements JDatabaseInterface
 	 * Wrap an SQL statement identifier name such as column, table or database names in quotes to prevent injection
 	 * risks and reserved word conflicts.
 	 *
-	 * @param   string  $name  The identifier name to wrap in quotes.
+	 * @param   mixed  $name  The identifier name to wrap in quotes, or an array of identifier names to wrap in quotes.
+	 * 							Each type supports dot-notation name.
+	 * @param   mixed  $as    The AS query part associated to $name. It can be string or array, in latter case it has to be
+	 * 							same length of $name; if is null there will not be any AS part for string or array element.
 	 *
-	 * @return  string  The quote wrapped name.
+	 * @return  mixed  The quote wrapped name, same type of $name.
 	 *
 	 * @since   11.1
 	 */
-	public function quoteName($name)
+	public function quoteName($name, $as = null)
 	{
-		// Don't quote names with dot-notation.
-		if (strpos($name, '.') !== false)
+		if (is_string($name))
 		{
-			return $name;
+			$quotedName = $this->quoteNameStr(explode('.', $name));
+
+			$quotedAs = '';
+			if (!is_null($as))
+			{
+				settype($as, 'array');
+				$quotedAs .= ' AS ' . $this->quoteNameStr($as);
+			}
+
+			return $quotedName . $quotedAs;
 		}
 		else
 		{
-			$q = $this->nameQuote;
+			$fin = array();
+
+			if (is_null($as))
+			{
+				foreach ($name as $str)
+				{
+					$fin[] = $this->quoteName($str);
+				}
+			}
+			elseif (is_array($name) && (count($name) == count($as)))
+			{
+				for ($i = 0; $i < count($name); $i++)
+				{
+					$fin[] = $this->quoteName($name[$i], $as[$i]);
+				}
+			}
+
+			return $fin;
+		}
+	}
+
+	/**
+	 * Quote strings coming from quoteName call.
+	 *
+	 * @param   array  $strArr  Array of strings coming from quoteName dot-explosion.
+	 *
+	 * @return  string  Dot-imploded string of quoted parts.
+	 *
+	 * @since 11.3
+	 */
+	protected function quoteNameStr($strArr)
+	{
+		$parts = array();
+		$q = $this->nameQuote;
+
+		foreach ($strArr as $part)
+		{
+			if (is_null($part))
+			{
+				continue;
+			}
 
 			if (strlen($q) == 1)
 			{
-				return $q . $name . $q;
+				$parts[] = $q . $part . $q;
 			}
 			else
 			{
-				return $q{0} . $name . $q{1};
+				$parts[] = $q{0} . $part . $q{1};
 			}
 		}
+
+		return implode('.', $parts);
 	}
 
 	/**
@@ -1278,7 +1323,7 @@ abstract class JDatabase implements JDatabaseInterface
 				break;
 			}
 
-			// quote comes first, find end of quote
+			// Quote comes first, find end of quote
 			while (true)
 			{
 				$k = strpos($sql, $quoteChar, $j);
@@ -1302,7 +1347,7 @@ abstract class JDatabase implements JDatabaseInterface
 			}
 			if ($k === false)
 			{
-				// error in the query - no end quote; ignore it
+				// Error in the query - no end quote; ignore it
 				break;
 			}
 			$literal .= substr($sql, $startPos, $k - $startPos + 1);
@@ -1315,6 +1360,21 @@ abstract class JDatabase implements JDatabaseInterface
 
 		return $literal;
 	}
+
+	/**
+	 * Renames a table in the database.
+	 *
+	 * @param   string  $oldTable  The name of the table to be renamed
+	 * @param   string  $newTable  The new name for the table.
+	 * @param   string  $backup    Table prefix
+	 * @param   string  $prefix    For the table - used to rename constraints in non-mysql databases
+	 *
+	 * @return  JDatabase  Returns this object to support chaining.
+	 *
+	 * @since   11.4
+	 * @throws  JDatabaseException
+	 */
+	public abstract function renameTable($oldTable, $newTable, $backup = null, $prefix = null);
 
 	/**
 	 * Select a database for use.
@@ -1475,7 +1535,7 @@ abstract class JDatabase implements JDatabaseInterface
 			// The field is not null so we prep it for update.
 			else
 			{
-				$val = $this->isQuoted($k) ? $this->quote($v) : (int) $v;
+				$val = $this->quote($v);
 			}
 
 			// Add the field to be updated.
@@ -1493,37 +1553,19 @@ abstract class JDatabase implements JDatabaseInterface
 		return $this->query();
 	}
 
-	//
-	// Deprecated methods.
-	//
-
 	/**
-	 * Sets the debug level on or off
+	 * Unlocks tables in the database.
 	 *
-	 * @param   integer  $level  0 to disable debugging and 1 to enable it.
+	 * @return  JDatabase  Returns this object to support chaining.
 	 *
-	 * @return  void
-	 *
-	 * @deprecated  12.1
-	 * @since   11.1
+	 * @since   11.4
+	 * @throws  JDatabaseException
 	 */
-	public function debug($level)
-	{
-		// Deprecation warning.
-		JLog::add('JDatabase::debug() is deprecated, use JDatabase::setDebug() instead.', JLog::NOTICE, 'deprecated');
+	public abstract function unlockTables();
 
-		$this->setDebug(($level == 0) ? false : true);
-	}
-
-	/**
-	 * Diagnostic method to return explain information for a query.
-	 *
-	 * @return  string  The explain output.
-	 *
-	 * @deprecated  12.1
-	 * @since   11.1
+	/*
+	 * Deprecated methods.
 	 */
-	abstract public function explain();
 
 	/**
 	 * Gets the error message from the database connection.
@@ -1565,147 +1607,6 @@ abstract class JDatabase implements JDatabaseInterface
 
 		return $this->errorNum;
 	}
-
-	/**
-	 * Method to escape a string for usage in an SQL statement.
-	 *
-	 * @param   string   $text   The string to be escaped.
-	 * @param   boolean  $extra  Optional parameter to provide extra escaping.
-	 *
-	 * @return  string  The escaped string.
-	 *
-	 * @since   11.1
-	 * @deprecated  12.1
-	 */
-	public function getEscaped($text, $extra = false)
-	{
-		// Deprecation warning.
-		JLog::add('JDatabase::getEscaped() is deprecated. Use JDatabase::escape().', JLog::WARNING, 'deprecated');
-
-		return $this->escape($text, $extra);
-	}
-
-	/**
-	 * Retrieves field information about the given tables.
-	 *
-	 * @param   mixed    $tables    A table name or a list of table names.
-	 * @param   boolean  $typeOnly  True to only return field types.
-	 *
-	 * @return  array  An array of fields by table.
-	 *
-	 * @since   11.1
-	 * @throws  JDatabaseException
-	 * @deprecated  12.1
-	 */
-	public function getTableFields($tables, $typeOnly = true)
-	{
-		// Deprecation warning.
-		JLog::add('JDatabase::getTableFields() is deprecated. Use JDatabase::getTableColumns().', JLog::WARNING, 'deprecated');
-
-		$results = array();
-
-		settype($tables, 'array');
-
-		foreach ($tables as $table)
-		{
-			$results[$table] = $this->getTableColumns($table, $typeOnly);
-		}
-
-		return $results;
-	}
-
-	/**
-	 * Get the total number of SQL statements executed by the database driver.
-	 *
-	 * @return      integer
-	 *
-	 * @since       11.1
-	 * @deprecated  12.1
-	 */
-	public function getTicker()
-	{
-		// Deprecation warning.
-		JLog::add('JDatabase::getTicker() is deprecated, use JDatabase::getCount() instead.', JLog::NOTICE, 'deprecated');
-
-		return $this->count;
-	}
-
-	/**
-	 * Checks if field name needs to be quoted.
-	 *
-	 * @param   string  $field  The field name to be checked.
-	 *
-	 * @return  bool
-	 *
-	 * @deprecated  12.1
-	 * @since   11.1
-	 */
-	public function isQuoted($field)
-	{
-		// Deprecation warning.
-		JLog::add('JDatabase::isQuoted() is deprecated.', JLog::WARNING, 'deprecated');
-
-		if ($this->hasQuoted)
-		{
-			return in_array($field, $this->quoted);
-		}
-		else
-		{
-			return true;
-		}
-	}
-
-	/**
-	 * Method to get an array of values from the <var>$offset</var> field in each row of the result set from
-	 * the database query.
-	 *
-	 * @param   integer  $offset  The row offset to use to build the result array.
-	 *
-	 * @return  mixed    The return value or null if the query failed.
-	 *
-	 * @since   11.1
-	 * @throws  JDatabaseException
-	 * @deprecated  12.1
-	 */
-	public function loadResultArray($offset = 0)
-	{
-		// Deprecation warning.
-		JLog::add('JDatabase::loadResultArray() is deprecated. Use JDatabase::loadColumn().', JLog::WARNING, 'deprecated');
-
-		return $this->loadColumn($offset);
-	}
-
-	/**
-	 * Wrap an SQL statement identifier name such as column, table or database names in quotes to prevent injection
-	 * risks and reserved word conflicts.
-	 *
-	 * @param   string  $name  The identifier name to wrap in quotes.
-	 *
-	 * @return  string  The quote wrapped name.
-	 *
-	 * @since   11.1
-	 * @deprecated  12.1
-	 */
-	public function nameQuote($name)
-	{
-		// Deprecation warning.
-		JLog::add('JDatabase::nameQuote() is deprecated. Use JDatabase::quoteName().', JLog::WARNING, 'deprecated');
-
-		return $this->quoteName($name);
-	}
-
-	/**
-	 * Execute a query batch.
-	 *
-	 * @param   boolean  $abortOnError     Abort on error.
-	 * @param   boolean  $transactionSafe  Transaction safe queries.
-	 *
-	 * @return  mixed  A database resource if successful, false if not.
-	 *
-	 * @deprecated  12.1
-	 * @since   11.1
-	 */
-	abstract public function queryBatch($abortOnError = true, $transactionSafe = false);
 
 	/**
 	 * Return the most recent error message for the database connector.

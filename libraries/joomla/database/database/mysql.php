@@ -3,15 +3,15 @@
  * @package     Joomla.Platform
  * @subpackage  Database
  *
- * @copyright   Copyright (C) 2005 - 2011 Open Source Matters, Inc. All rights reserved.
+ * @copyright   Copyright (C) 2005 - 2012 Open Source Matters, Inc. All rights reserved.
  * @license     GNU General Public License version 2 or later; see LICENSE
  */
 
 defined('JPATH_PLATFORM') or die;
 
-JLoader::register('JDatabaseQueryMySQL', dirname(__FILE__) . '/mysqlquery.php');
-JLoader::register('JDatabaseExporterMySQL', dirname(__FILE__) . '/mysqlexporter.php');
-JLoader::register('JDatabaseImporterMySQL', dirname(__FILE__) . '/mysqlimporter.php');
+JLoader::register('JDatabaseQueryMySQL', __DIR__ . '/mysqlquery.php');
+JLoader::register('JDatabaseExporterMySQL', __DIR__ . '/mysqlexporter.php');
+JLoader::register('JDatabaseImporterMySQL', __DIR__ . '/mysqlimporter.php');
 
 /**
  * MySQL database driver
@@ -189,6 +189,7 @@ class JDatabaseMySQL extends JDatabase
 	 * @return  JDatabaseMySQL  Returns this object to support chaining.
 	 *
 	 * @since   11.1
+	 * @throws  JDatabaseException
 	 */
 	public function dropTable($tableName, $ifExists = true)
 	{
@@ -431,20 +432,6 @@ class JDatabaseMySQL extends JDatabase
 	}
 
 	/**
-	 * Determines if the database engine supports UTF-8 character encoding.
-	 *
-	 * @return  boolean  True if supported.
-	 *
-	 * @since   11.1
-	 * @deprecated 12.1
-	 */
-	public function hasUTF()
-	{
-		JLog::add('JDatabaseMySQL::hasUTF() is deprecated.', JLog::WARNING, 'deprecated');
-		return true;
-	}
-
-	/**
 	 * Method to get the auto-incremented value from the last INSERT statement.
 	 *
 	 * @return  integer  The value of the auto-increment field from the last inserted row.
@@ -454,6 +441,23 @@ class JDatabaseMySQL extends JDatabase
 	public function insertid()
 	{
 		return mysql_insert_id($this->connection);
+	}
+
+	/**
+	 * Locks a table in the database.
+	 *
+	 * @param   string  $table  The name of the table to unlock.
+	 *
+	 * @return  JDatabaseMySQL  Returns this object to support chaining.
+	 *
+	 * @since   11.4
+	 * @throws  JDatabaseException
+	 */
+	public function lockTable($table)
+	{
+		$this->setQuery('LOCK TABLES ' . $this->quoteName($table) . ' WRITE')->query();
+
+		return $this;
 	}
 
 	/**
@@ -533,6 +537,26 @@ class JDatabaseMySQL extends JDatabase
 		}
 
 		return $this->cursor;
+	}
+
+	/**
+	 * Renames a table in the database.
+	 *
+	 * @param   string  $oldTable  The name of the table to be renamed
+	 * @param   string  $newTable  The new name for the table.
+	 * @param   string  $backup    Not used by MySQL.
+	 * @param   string  $prefix    Not used by MySQL.
+	 *
+	 * @return  JDatabase  Returns this object to support chaining.
+	 *
+	 * @since   11.4
+	 * @throws  JDatabaseException
+	 */
+	public function renameTable($oldTable, $newTable, $backup = null, $prefix = null)
+	{
+		$this->setQuery('RENAME TABLE ' . $oldTable . ' TO ' . $newTable)->query();
+
+		return $this;
 	}
 
 	/**
@@ -683,114 +707,17 @@ class JDatabaseMySQL extends JDatabase
 	}
 
 	/**
-	 * Diagnostic method to return explain information for a query.
+	 * Unlocks tables in the database.
 	 *
-	 * @return      string  The explain output.
+	 * @return  JDatabaseMySQL  Returns this object to support chaining.
 	 *
-	 * @since       11.1
-	 * @deprecated  12.1
+	 * @since   11.4
+	 * @throws  JDatabaseException
 	 */
-	public function explain()
+	public function unlockTables()
 	{
-		// Deprecation warning.
-		JLog::add('JDatabaseMySQL::explain() is deprecated.', JLog::WARNING, 'deprecated');
+		$this->setQuery('UNLOCK TABLES')->query();
 
-		// Backup the current query so we can reset it later.
-		$backup = $this->sql;
-
-		// Prepend the current query with EXPLAIN so we get the diagnostic data.
-		$this->sql = 'EXPLAIN ' . $this->sql;
-
-		// Execute the query and get the result set cursor.
-		if (!($cursor = $this->query()))
-		{
-			return null;
-		}
-
-		// Build the HTML table.
-		$first = true;
-		$buffer = '<table id="explain-sql">';
-		$buffer .= '<thead><tr><td colspan="99">' . $this->getQuery() . '</td></tr>';
-		while ($row = $this->fetchAssoc($cursor))
-		{
-			if ($first)
-			{
-				$buffer .= '<tr>';
-				foreach ($row as $k => $v)
-				{
-					$buffer .= '<th>' . $k . '</th>';
-				}
-				$buffer .= '</tr></thead><tbody>';
-				$first = false;
-			}
-			$buffer .= '<tr>';
-			foreach ($row as $k => $v)
-			{
-				$buffer .= '<td>' . $v . '</td>';
-			}
-			$buffer .= '</tr>';
-		}
-		$buffer .= '</tbody></table>';
-
-		// Restore the original query to its state before we ran the explain.
-		$this->sql = $backup;
-
-		// Free up system resources and return.
-		$this->freeResult($cursor);
-
-		return $buffer;
-	}
-
-	/**
-	 * Execute a query batch.
-	 *
-	 * @param   boolean  $abortOnError     Abort on error.
-	 * @param   boolean  $transactionSafe  Transaction safe queries.
-	 *
-	 * @return  mixed  A database resource if successful, false if not.
-	 *
-	 * @deprecated  12.1
-	 * @since   11.1
-	 */
-	public function queryBatch($abortOnError = true, $transactionSafe = false)
-	{
-		// Deprecation warning.
-		JLog::add('JDatabaseMySQL::queryBatch() is deprecated.', JLog::WARNING, 'deprecated');
-
-		$sql = $this->replacePrefix((string) $this->sql);
-		$this->errorNum = 0;
-		$this->errorMsg = '';
-
-		// If the batch is meant to be transaction safe then we need to wrap it in a transaction.
-		if ($transactionSafe)
-		{
-			$sql = 'START TRANSACTION;' . rtrim($sql, "; \t\r\n\0") . '; COMMIT;';
-		}
-		$queries = $this->splitSql($sql);
-		$error = 0;
-		foreach ($queries as $query)
-		{
-			$query = trim($query);
-			if ($query != '')
-			{
-				$this->cursor = mysql_query($query, $this->connection);
-				if ($this->debug)
-				{
-					$this->count++;
-					$this->log[] = $query;
-				}
-				if (!$this->cursor)
-				{
-					$error = 1;
-					$this->errorNum .= mysql_errno($this->connection) . ' ';
-					$this->errorMsg .= mysql_error($this->connection) . " SQL=$query <br />";
-					if ($abortOnError)
-					{
-						return $this->cursor;
-					}
-				}
-			}
-		}
-		return $error ? false : true;
+		return $this;
 	}
 }

@@ -1,7 +1,7 @@
 <?php
 /**
  * @package    Joomla.UnitTest
- * @copyright  Copyright (C) 2005 - 2011 Open Source Matters. All rights reserved.
+ * @copyright  Copyright (C) 2005 - 2012 Open Source Matters. All rights reserved.
  * @license    GNU General Public License
  */
 
@@ -34,11 +34,9 @@ class JDatabaseGlobalMock
 	{
 		// Collect all the relevant methods in JDatabase.
 		$methods = array(
-			'addQuoted',
 			'connected',
-			'debug',
+			'dropTable',
 			'escape',
-			'explain',
 			'fetchArray',
 			'fetchAssoc',
 			'fetchObject',
@@ -49,7 +47,6 @@ class JDatabaseGlobalMock
 			'getDateFormat',
 			'getErrorMsg',
 			'getErrorNum',
-			'getEscaped',
 			'getInstance',
 			'getLog',
 			'getNullDate',
@@ -58,13 +55,10 @@ class JDatabaseGlobalMock
 			'getQuery',
 			'getTableColumns',
 			'getTableCreate',
-			'getTableFields',
 			'getTableKeys',
 			'getTableList',
-			'getTicker',
 			'getUtfSupport',
 			'getVersion',
-			'hasUTF',
 			'insertId',
 			'insertObject',
 			'loadAssoc',
@@ -73,14 +67,13 @@ class JDatabaseGlobalMock
 			'loadObject',
 			'loadObjectList',
 			'loadResult',
-			'loadResultArray',
 			'loadRow',
 			'loadRowList',
-			'nameQuote',
+			'lockTable',
 			'query',
-			'queryBatch',
 			'quote',
 			'quoteName',
+			'renameTable',
 			'replacePrefix',
 			'select',
 			'setQuery',
@@ -90,6 +83,7 @@ class JDatabaseGlobalMock
 			'transactionCommit',
 			'transactionRollback',
 			'transactionStart',
+			'unlockTables',
 			'updateObject',
 		);
 
@@ -164,7 +158,7 @@ class JDatabaseGlobalMock
 	}
 
 	/**
-	 * Mock nameQuote method.
+	 * Mock quoteName method.
 	 *
 	 * @param  string  $value  The value to be quoted.
 	 *

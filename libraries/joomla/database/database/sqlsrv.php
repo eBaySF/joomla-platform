@@ -3,13 +3,13 @@
  * @package     Joomla.Platform
  * @subpackage  Database
  *
- * @copyright   Copyright (C) 2005 - 2011 Open Source Matters, Inc. All rights reserved.
+ * @copyright   Copyright (C) 2005 - 2012 Open Source Matters, Inc. All rights reserved.
  * @license     GNU General Public License version 2 or later; see LICENSE
  */
 
 defined('JPATH_PLATFORM') or die;
 
-JLoader::register('JDatabaseQuerySQLSrv', dirname(__FILE__) . '/sqlsrvquery.php');
+JLoader::register('JDatabaseQuerySQLSrv', __DIR__ . '/sqlsrvquery.php');
 
 /**
  * SQL Server database driver
@@ -38,7 +38,7 @@ class JDatabaseSQLSrv extends JDatabase
 	 * @var    string
 	 * @since  11.1
 	 */
-	protected $nameQuote;
+	protected $nameQuote = '[]';
 
 	/**
 	 * The null or zero representation of a timestamp for the database driver.  This should be
@@ -206,7 +206,8 @@ class JDatabaseSQLSrv extends JDatabase
 		$result = addslashes($text);
 		$result = str_replace("\'", "''", $result);
 		$result = str_replace('\"', '"', $result);
-		//$result = str_replace("\\", "''", $result);
+
+		// $result = str_replace("\\", "''", $result);
 
 		if ($extra)
 		{
@@ -239,14 +240,22 @@ class JDatabaseSQLSrv extends JDatabase
 	 * @return  JDatabaseSQLSrv  Returns this object to support chaining.
 	 *
 	 * @since   11.1
+	 * @throws  JDatabaseException
 	 */
 	public function dropTable($tableName, $ifExists = true)
 	{
 		$query = $this->getQuery(true);
 
-		$this->setQuery(
-			'IF EXISTS(SELECT TABLE_NAME FROM' . ' INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = ' . $query->quote($tableName) . ') DROP TABLE'
-		);
+		if ($ifExists)
+		{
+			$this->setQuery(
+				'IF EXISTS(SELECT TABLE_NAME FROM' . ' INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = ' . $query->quote($tableName) . ') DROP TABLE ' . $tableName
+			);
+		}
+		else
+		{
+			$this->setQuery('DROP TABLE ' . $tableName);
+		}
 
 		$this->query();
 
@@ -351,11 +360,11 @@ class JDatabaseSQLSrv extends JDatabase
 		if ($new)
 		{
 			// Make sure we have a query class for this driver.
-			if (!class_exists('JDatabaseQuerySQLAzure'))
+			if (!class_exists('JDatabaseQuerySQLSrv'))
 			{
 				throw new JDatabaseException(JText::_('JLIB_DATABASE_ERROR_MISSING_QUERY'));
 			}
-			return new JDatabaseQuerySQLAzure($this);
+			return new JDatabaseQuerySQLSrv($this);
 		}
 		else
 		{
@@ -366,45 +375,42 @@ class JDatabaseSQLSrv extends JDatabase
 	/**
 	 * Retrieves field information about the given tables.
 	 *
-	 * @param   mixed    $tables    A table name or a list of table names.
+	 * @param   mixed    $table     A table name
 	 * @param   boolean  $typeOnly  True to only return field types.
 	 *
-	 * @return  array  An array of fields by table.
+	 * @return  array  An array of fields.
 	 *
 	 * @since   11.1
 	 * @throws  JDatabaseException
 	 */
-	public function getTableColumns($tables, $typeOnly = true)
+	public function getTableColumns($table, $typeOnly = true)
 	{
 		// Initialise variables.
 		$result = array();
 
-		// Sanitize input to an array and iterate over the list.
-		settype($tables, 'array');
-		foreach ($tables as $table)
-		{
-			// Set the query to get the table fields statement.
-			$this->setQuery(
-				'SELECT column_name as Field, data_type as Type, is_nullable as \'Null\', column_default as \'Default\'' .
-				' FROM information_schema.columns' . ' WHERE table_name = ' . $this->quote($table)
-			);
-			$fields = $this->loadObjectList();
+		$table_temp = $this->replacePrefix((string) $table);
 
-			// If we only want the type as the value add just that to the list.
-			if ($typeOnly)
+		// Set the query to get the table fields statement.
+		$this->setQuery(
+			'SELECT column_name as Field, data_type as Type, is_nullable as \'Null\', column_default as \'Default\'' .
+			' FROM information_schema.columns' . ' WHERE table_name = ' . $this->quote($table_temp)
+		);
+		$fields = $this->loadObjectList();
+
+		// If we only want the type as the value add just that to the list.
+		if ($typeOnly)
+		{
+			foreach ($fields as $field)
 			{
-				foreach ($fields as $field)
-				{
-					$result[$table][$field->Field] = preg_replace("/[(0-9)]/", '', $field->Type);
-				}
+				$result[$field->Field] = preg_replace("/[(0-9)]/", '', $field->Type);
 			}
-			// If we want the whole field data object add that to the list.
-			else
+		}
+		// If we want the whole field data object add that to the list.
+		else
+		{
+			foreach ($fields as $field)
 			{
-				foreach ($fields as $field)
-				{
-					$result[$table][$field->Field] = $field;
-				}
+				$result[$field->Field] = $field;
 			}
 		}
 
@@ -455,7 +461,7 @@ class JDatabaseSQLSrv extends JDatabase
 	public function getTableList()
 	{
 		// Set the query to get the tables statement.
-		$this->setQuery('SELECT name FROM sysobjects WHERE xtype = \'U\';');
+		$this->setQuery('SELECT name FROM ' . $this->getDatabase() . '.sys.Tables WHERE type = \'U\';');
 		$tables = $this->loadColumn();
 
 		return $tables;
@@ -470,19 +476,59 @@ class JDatabaseSQLSrv extends JDatabase
 	 */
 	public function getVersion()
 	{
-		//TODO: Don't hardcode this.
-		return '5.1.0';
+		return sqlsrv_server_info($this->connection);
 	}
 
 	/**
-	 * Determines if the database engine supports UTF-8 character encoding.
+	 * Inserts a row into a table based on an object's properties.
 	 *
-	 * @return  boolean  True if supported.
+	 * @param   string  $table    The name of the database table to insert into.
+	 * @param   object  &$object  A reference to an object whose public properties match the table fields.
+	 * @param   string  $key      The name of the primary key. If provided the object property is updated.
+	 *
+	 * @return  boolean    True on success.
 	 *
 	 * @since   11.1
+	 * @throws  JDatabaseException
 	 */
-	public function hasUTF()
+	public function insertObject($table, &$object, $key = null)
 	{
+		$fields = array();
+		$values = array();
+		$statement = 'INSERT INTO ' . $this->quoteName($table) . ' (%s) VALUES (%s)';
+		foreach (get_object_vars($object) as $k => $v)
+		{
+			if (is_array($v) or is_object($v))
+			{
+				continue;
+			}
+			if (!$this->checkFieldExists($table, $k))
+			{
+				continue;
+			}
+			if ($k[0] == '_')
+			{
+				// Internal field
+				continue;
+			}
+			if ($k == $key && $key == 0)
+			{
+				continue;
+			}
+			$fields[] = $this->quoteName($k);
+			$values[] = $this->Quote($v);
+		}
+		// Set the query and execute the insert.
+		$this->setQuery(sprintf($statement, implode(',', $fields), implode(',', $values)));
+		if (!$this->query())
+		{
+			return false;
+		}
+		$id = $this->insertid();
+		if ($key && $id)
+		{
+			$object->$key = $id;
+		}
 		return true;
 	}
 
@@ -498,6 +544,39 @@ class JDatabaseSQLSrv extends JDatabase
 		// TODO: SELECT IDENTITY
 		$this->setQuery('SELECT @@IDENTITY');
 		return (int) $this->loadResult();
+	}
+
+	/**
+	 * Method to get the first field of the first row of the result set from the database query.
+	 *
+	 * @return  mixed  The return value or null if the query failed.
+	 *
+	 * @since   11.1
+	 * @throws  JDatabaseException
+	 */
+	public function loadResult()
+	{
+		// Initialise variables.
+		$ret = null;
+
+		// Execute the query and get the result set cursor.
+		if (!($cursor = $this->query()))
+		{
+			return null;
+		}
+
+		// Get the first row from the result set as an array.
+		if ($row = sqlsrv_fetch_array($cursor, SQLSRV_FETCH_NUMERIC))
+		{
+			$ret = $row[0];
+		}
+		// Free up system resources and return.
+		$this->freeResult($cursor);
+
+		// For SQLServer - we need to strip slashes
+		$ret = stripslashes($ret);
+
+		return $ret;
 	}
 
 	/**
@@ -553,8 +632,8 @@ class JDatabaseSQLSrv extends JDatabase
 		$this->errorNum = 0;
 		$this->errorMsg = '';
 
-		// sqlsrv_num_rows requires a static or keyset cursor.
-		if (JString::startsWith(ltrim(strtoupper($sql)), 'SELECT'))
+		// SQLSrv_num_rows requires a static or keyset cursor.
+		if (strncmp(ltrim(strtoupper($sql)), 'SELECT', strlen('SELECT')) == 0)
 		{
 			$array = array('Scrollable' => SQLSRV_CURSOR_KEYSET);
 		}
@@ -594,6 +673,102 @@ class JDatabaseSQLSrv extends JDatabase
 		}
 
 		return $this->cursor;
+	}
+	/**
+	 * This function replaces a string identifier <var>$prefix</var> with the string held is the
+	 * <var>tablePrefix</var> class variable.
+	 *
+	 * @param   string  $sql     The SQL statement to prepare.
+	 * @param   string  $prefix  The common table prefix.
+	 *
+	 * @return  string  The processed SQL statement.
+	 *
+	 * @since   11.1
+	 */
+	public function replacePrefix($sql, $prefix = '#__')
+	{
+		$tablePrefix = 'jos_';
+
+		// Initialize variables.
+		$escaped = false;
+		$startPos = 0;
+		$quoteChar = '';
+		$literal = '';
+
+		$sql = trim($sql);
+		$n = strlen($sql);
+
+		while ($startPos < $n)
+		{
+			$ip = strpos($sql, $prefix, $startPos);
+			if ($ip === false)
+			{
+				break;
+			}
+
+			$j = strpos($sql, "N'", $startPos);
+			$k = strpos($sql, '"', $startPos);
+			if (($k !== false) && (($k < $j) || ($j === false)))
+			{
+				$quoteChar = '"';
+				$j = $k;
+			}
+			else
+			{
+				$quoteChar = "'";
+			}
+
+			if ($j === false)
+			{
+				$j = $n;
+			}
+
+			$literal .= str_replace($prefix, $this->tablePrefix, substr($sql, $startPos, $j - $startPos));
+			$startPos = $j;
+
+			$j = $startPos + 1;
+
+			if ($j >= $n)
+			{
+				break;
+			}
+
+			// Quote comes first, find end of quote
+			while (true)
+			{
+				$k = strpos($sql, $quoteChar, $j);
+				$escaped = false;
+				if ($k === false)
+				{
+					break;
+				}
+				$l = $k - 1;
+				while ($l >= 0 && $sql{$l} == '\\')
+				{
+					$l--;
+					$escaped = !$escaped;
+				}
+				if ($escaped)
+				{
+					$j = $k + 1;
+					continue;
+				}
+				break;
+			}
+			if ($k === false)
+			{
+				// Error in the query - no end quote; ignore it
+				break;
+			}
+			$literal .= substr($sql, $startPos, $k - $startPos + 1);
+			$startPos = $k + 1;
+		}
+		if ($startPos < $n)
+		{
+			$literal .= substr($sql, $startPos, $n - $startPos);
+		}
+
+		return $literal;
 	}
 
 	/**
@@ -745,129 +920,6 @@ class JDatabaseSQLSrv extends JDatabase
 	}
 
 	/**
-	 * Diagnostic method to return explain information for a query.
-	 *
-	 * @return      string  The explain output.
-	 *
-	 * @deprecated  12.1
-	 * @see         http://msdn.microsoft.com/en-us/library/aa259203%28SQL.80%29.aspx
-	 * @since       11.1
-	 */
-	public function explain()
-	{
-		// Deprecation warning.
-		JLog::add('JDatabase::explain() is deprecated.', JLog::WARNING, 'deprecated');
-
-		// Backup the current query so we can reset it later.
-		$backup = $this->sql;
-
-		// SET SHOWPLAN_ALL ON - will make sqlsrv to show some explain of query instead of run it
-		$this->setQuery('SET SHOWPLAN_ALL ON');
-		$this->query();
-
-		// Execute the query and get the result set cursor.
-		$this->setQuery($backup);
-		if (!($cursor = $this->query()))
-		{
-			return null;
-		}
-
-		// Build the HTML table.
-		$first = true;
-		$buffer = '<table id="explain-sql">';
-		$buffer .= '<thead><tr><td colspan="99">' . $this->getQuery() . '</td></tr>';
-		while ($row = $this->fetchAssoc($cursor))
-		{
-			if ($first)
-			{
-				$buffer .= '<tr>';
-				foreach ($row as $k => $v)
-				{
-					$buffer .= '<th>' . $k . '</th>';
-				}
-				$buffer .= '</tr></thead>';
-				$first = false;
-			}
-			$buffer .= '<tbody><tr>';
-			foreach ($row as $k => $v)
-			{
-				$buffer .= '<td>' . $v . '</td>';
-			}
-			$buffer .= '</tr>';
-		}
-		$buffer .= '</tbody></table>';
-
-		// Free up system resources and return.
-		$this->freeResult($cursor);
-
-		// Remove the explain status.
-		$this->setQuery('SET SHOWPLAN_ALL OFF');
-		$this->query();
-
-		// Restore the original query to its state before we ran the explain.
-		$this->sql = $backup;
-
-		return $buffer;
-	}
-
-	/**
-	 * Execute a query batch.
-	 *
-	 * @param   boolean  $abortOnError     Abort on error.
-	 * @param   boolean  $transactionSafe  Transaction safe queries.
-	 *
-	 * @return  mixed  A database resource if successful, false if not.
-	 *
-	 * @since   11.1
-	 * @deprecated  12.1
-	 */
-	public function queryBatch($abortOnError = true, $transactionSafe = false)
-	{
-		// Deprecation warning.
-		JLog::add('JDatabase::queryBatch() is deprecated.', JLog::WARNING, 'deprecated');
-
-		$sql = $this->replacePrefix((string) $this->sql);
-		$this->errorNum = 0;
-		$this->errorMsg = '';
-
-		// If the batch is meant to be transaction safe then we need to wrap it in a transaction.
-		if ($transactionSafe)
-		{
-			$this->_sql = 'BEGIN TRANSACTION;' . $this->sql . '; COMMIT TRANSACTION;';
-		}
-
-		$queries = $this->splitSql($sql);
-		$error = 0;
-		foreach ($queries as $query)
-		{
-			$query = trim($query);
-
-			if ($query != '')
-			{
-				$this->cursor = sqlsrv_query($this->connection, $query, null, array('scrollable' => SQLSRV_CURSOR_STATIC));
-				if ($this->_debug)
-				{
-					$this->count++;
-					$this->log[] = $query;
-				}
-				if (!$this->cursor)
-				{
-					$error = 1;
-					$errors = sqlsrv_errors();
-					$this->errorNum = $errors[0]['sqlstate'];
-					$this->errorMsg = $errors[0]['message'];
-
-					if ($abortOnError)
-					{
-						return $this->cursor;
-					}
-				}
-			}
-		}
-		return $error ? false : true;
-	}
-
-	/**
 	 * Method to check and see if a field exists in a table.
 	 *
 	 * @param   string  $table  The table in which to verify the field.
@@ -920,5 +972,64 @@ class JDatabaseSQLSrv extends JDatabase
 		$sql = 'SELECT TOP ' . $this->limit . ' * FROM (' . $sql . ') _myResults WHERE RowNumber > ' . $this->offset;
 
 		return $sql;
+	}
+
+	/**
+	 * Renames a table in the database.
+	 *
+	 * @param   string  $oldTable  The name of the table to be renamed
+	 * @param   string  $newTable  The new name for the table.
+	 * @param   string  $backup    Table prefix
+	 * @param   string  $prefix    For the table - used to rename constraints in non-mysql databases
+	 *
+	 * @return  JDatabase  Returns this object to support chaining.
+	 *
+	 * @since   11.4
+	 * @throws  JDatabaseException
+	 */
+	public function renameTable($oldTable, $newTable, $backup = null, $prefix = null)
+	{
+		$constraints = array();
+
+		if (!is_null($prefix) && !is_null($backup))
+		{
+			$constraints = $this->getTableConstraints($oldTable);
+		}
+		if (!empty($constraints))
+		{
+			$this->renameConstraints($constraints, $prefix, $backup);
+		}
+
+		$this->setQuery("sp_rename '" . $oldTable . "', '" . $newTable . "'");
+
+		return $this->query();
+	}
+
+	/**
+	 * Locks a table in the database.
+	 *
+	 * @param   string  $tableName  The name of the table to lock.
+	 *
+	 * @return  JDatabase  Returns this object to support chaining.
+	 *
+	 * @since   11.4
+	 * @throws  JDatabaseException
+	 */
+	public function lockTable($tableName)
+	{
+		return $this;
+	}
+
+	/**
+	 * Unlocks tables in the database.
+	 *
+	 * @return  JDatabase  Returns this object to support chaining.
+	 *
+	 * @since   11.4
+	 * @throws  JDatabaseException
+	 */
+	public function unlockTables()
+	{
+		return $this;
 	}
 }
