@@ -37,16 +37,14 @@ abstract class JViewBase implements JView
 	/**
 	 * Method to instantiate the view.
 	 *
-	 * @param   JModel       $model       The model object.
-	 * @param   JController  $controller  The controller object.
+	 * @param   JModel  $model  The model object.
 	 *
 	 * @since  12.1
 	 */
-	public function __construct(JModel $model, JController $controller)
+	public function __construct(JModel $model)
 	{
 		// Setup dependencies.
 		$this->model = $model;
-		$this->controller = $controller;
 	}
 
 	/**
