@@ -8,6 +8,5 @@
   <title>JController</title>
 
   <para><interfacename>JController</interfacename> is an interface that requires a class to be implemented with an
-  <methodname>execute</methodname>, a <methodname>getApplication</methodname> and a <methodname>getInput</methodname>
-  method.</para>
+  <methodname>execute</methodname> and a <methodname>getInput</methodname>  method.</para>
 </section>

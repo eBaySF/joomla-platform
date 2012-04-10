@@ -32,15 +32,6 @@ interface JController extends Serializable
 	public function execute();
 
 	/**
-	 * Get the application object.
-	 *
-	 * @return  JApplicationBase  The application object.
-	 *
-	 * @since   12.1
-	 */
-	public function getApplication();
-
-	/**
 	 * Get the input object.
 	 *
 	 * @return  JInput  The input object.

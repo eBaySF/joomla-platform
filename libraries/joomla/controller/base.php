@@ -18,13 +18,6 @@ defined('JPATH_PLATFORM') or die;
  */
 abstract class JControllerBase implements JController
 {
-	/**
-	 * The application object.
-	 *
-	 * @var    JApplicationBase
-	 * @since  12.1
-	 */
-	protected $app;
 
 	/**
 	 * The input object.
@@ -38,27 +31,13 @@ abstract class JControllerBase implements JController
 	 * Instantiate the controller.
 	 *
 	 * @param   JInput            $input  The input object.
-	 * @param   JApplicationBase  $app    The application object.
 	 *
 	 * @since  12.1
 	 */
-	public function __construct(JInput $input = null, JApplicationBase $app = null)
+	public function __construct(JInput $input = null)
 	{
 		// Setup dependencies.
-		$this->app = isset($app) ? $app : $this->loadApplication();
 		$this->input = isset($input) ? $input : $this->loadInput();
-	}
-
-	/**
-	 * Get the application object.
-	 *
-	 * @return  JApplicationBase  The application object.
-	 *
-	 * @since   12.1
-	 */
-	public function getApplication()
-	{
-		return $this->app;
 	}
 
 	/**
@@ -97,9 +76,6 @@ abstract class JControllerBase implements JController
 	 */
 	public function unserialize($input)
 	{
-		// Setup dependencies.
-		$this->app = $this->loadApplication();
-
 		// Unserialize the input.
 		$this->input = unserialize($input);
 
@@ -112,18 +88,6 @@ abstract class JControllerBase implements JController
 	}
 
 	/**
-	 * Load the application object.
-	 *
-	 * @return  JApplicationBase  The application object.
-	 *
-	 * @since   12.1
-	 */
-	protected function loadApplication()
-	{
-		return JFactory::getApplication();
-	}
-
-	/**
 	 * Load the input object.
 	 *
 	 * @return  JInput  The input object.
@@ -132,6 +96,6 @@ abstract class JControllerBase implements JController
 	 */
 	protected function loadInput()
 	{
-		return $this->app->input;
+		return JFactory::getApplication()->input;
 	}
 }
