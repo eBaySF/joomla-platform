@@ -10,13 +10,13 @@
   <section>
     <title>Introduction</title>
 
-    <para>Version 12.1 of the platform introduced a new format for model-view-controller paradigm. Principly, the classes
+    <para>Version 12.1 of the platform introduced a new format for model-view-controller paradigm. Principally, the classes
     <classname>JModel</classname>, <classname>JView</classname> and <classname>JController</classname> are now interfaces and the
     base abstract classes are now <classname>JModelBase</classname>, <classname>JViewBase</classname> and
     <classname>JControllerBase</classname> respectively. In additional, all classes have been simplified removing a lot of
     coupling with the Joomla CMS that is unnecessary for standalone Joomla Platform applications.</para>
 
-    <para>All the API for controllers, models and views has moved from the Application package into separate Controller, Model and
+    <para>The API for controllers, models and views have been moved from the Application package into separate Controller, Model and
     View packages respectively. Much of the API previously devoted to adding include paths for each of the classes has been
     removed because of improvements in the auto-loader or by registering or discovering classes explicitly using
     <classname>JLoader</classname>.</para>
